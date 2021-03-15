@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Requests\EndGameRequest;
+use App\Http\Resources\EndedMatchResources;
+use App\Http\Resources\LeaderBoardResources;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Redis;
@@ -29,18 +31,7 @@ class MatchController extends Controller
             Redis::hGetAll("matches:$matchId");
         }
 
-        return response()->json([
-            'status' => 200,
-            'timestamp' => Carbon::now(),
-            'results' => [
-                'user_points' => [
-                    'player_1_id' => $ended_matches[0]['user_id'],
-                    'player_1_score' => $ended_matches[0]['score'],
-                    'player_2_id' => $ended_matches[1]['user_id'],
-                    'player_2_score' => $ended_matches[1]['score'],
-                ]
-            ]
-        ]);
+        return new EndedMatchResources($ended_matches);
     }
 
     /**
@@ -64,7 +55,7 @@ class MatchController extends Controller
     }
 
     /**
-     * @return \Illuminate\Support\Collection
+     * @return \Illuminate\Http\Resources\Json\AnonymousResourceCollection
      */
     public function leaderBoard()
     {
@@ -73,9 +64,10 @@ class MatchController extends Controller
         foreach ($keys as $index => $key) {
             $match = explode(":", $key);
             $matches[$index] = Redis::hGetAll('matches:'.$match[1]);
-            Redis::sadd('leaderboard', Redis::hGetAll('matches:'.$match[1]));
+            Redis::hGetAll('matches:'.$match[1]);
         }
+        $matches = collect($matches)->sortByDesc('score');
 
-        return collect($matches)->sortByDesc('score');
+        return LeaderBoardResources::collection($matches);
     }
 }
